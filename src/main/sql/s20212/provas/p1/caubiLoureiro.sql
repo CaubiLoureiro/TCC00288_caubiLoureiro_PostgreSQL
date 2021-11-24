@@ -133,15 +133,15 @@ $$ LANGUAGE plpgsql;
 
 CREATE FUNCTION repeticoes(elemento integer, vetor integer[]) RETURNS real AS $$
     DECLARE
-        freq_absoluta real = 0;
-        n real = cardinality(vetor);
+        repeti_abs real = 0;
+        len real = cardinality(vetor);
     BEGIN
-        FOR i IN 1..n LOOP
+        FOR i IN 1..len LOOP
             IF (vetor[i] = elemento) THEN
-                freq_absoluta = freq_absoluta + 1;
+                repeti_abs = repeti_abs + 1;
             END IF;
         END LOOP;
-        RETURN freq_absoluta / n;
+        RETURN repeti_abs / len;
     END;
 $$ LANGUAGE plpgsql;
 
@@ -169,7 +169,7 @@ CREATE FUNCTION vetor_respostas(id_pesquisa integer, id_pregunta integer) RETURN
     END;
 $$ LANGUAGE plpgsql;
 
-CREATE FUNCTION Lrespostas(pesq_id integer, perg_id integer, p_bairros varchar[], p_cidades varchar[]) RETURNS integer[] AS $$
+CREATE FUNCTION Lresp(pesq_id integer, perg_id integer, p_bairros varchar[], p_cidades varchar[]) RETURNS integer[] AS $$
     DECLARE
         respostas integer[];
         
@@ -222,7 +222,7 @@ CREATE FUNCTION resultado(pesquisa integer, p_bairros varchar[], p_cidades varch
 
         ELSE
             FOREACH pergunt IN ARRAY vetor_perguntas(pesquisa) LOOP
-                respostas = Lrespostas(pesquisa, pergunt, p_bairros, p_cidades);
+                respostas = Lresp(pesquisa, pergunt, p_bairros, p_cidades);
                 IF (respostas IS NOT NULL) THEN
                     FOREACH alternativa IN ARRAY alternativas(pergunt) LOOP
                         histogra = array_cat(histogra, ARRAY[ ARRAY[alternativa::real, repeticoes(alternativa, respostas)] ]);
@@ -232,8 +232,7 @@ CREATE FUNCTION resultado(pesquisa integer, p_bairros varchar[], p_cidades varch
                 END IF;
             END LOOP;
         END IF;
-        RETURN QUERY
-        SELECT * FROM ans;
+        RETURN QUERY SELECT * FROM ans;
     END;
 $$ LANGUAGE plpgsql;
 
