@@ -122,14 +122,7 @@ insert into escolha values (5,1,1,2);
 insert into escolha values (5,1,2,1);
 insert into escolha values (5,1,3,1);
 
-CREATE FUNCTION alternativas(id_pergunta integer) RETURNS integer[] AS $$
-    DECLARE
-        x integer[];
-    BEGIN
-        SELECT array_agg(numero) INTO x FROM resposta WHERE (pergunta = id_pergunta) GROUP BY pesquisa, pergunta;
-        RETURN x;
-    END;
-$$ LANGUAGE plpgsql;
+
 
 CREATE FUNCTION repeticoes(elemento integer, vetor integer[]) RETURNS real AS $$
     DECLARE
@@ -156,6 +149,18 @@ CREATE FUNCTION vetor_perguntas(pesquisa integer) RETURNS integer[] AS $$
         RETURN perguntas;
     END;
 $$ LANGUAGE plpgsql;
+
+
+CREATE FUNCTION alternativas(id_pergunta integer) RETURNS integer[] AS $$
+    DECLARE
+        x integer[];
+    BEGIN
+        SELECT array_agg(numero) INTO x FROM resposta WHERE (pergunta = id_pergunta) GROUP BY pesquisa, pergunta;
+        RETURN x;
+    END;
+$$ LANGUAGE plpgsql;
+
+
 
 CREATE FUNCTION vetor_respostas(id_pesquisa integer, id_pregunta integer) RETURNS integer[] AS $$
     DECLARE
