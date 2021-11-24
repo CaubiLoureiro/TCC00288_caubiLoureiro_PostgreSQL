@@ -237,4 +237,4 @@ CREATE FUNCTION resultado(pesquisa integer, p_bairros varchar[], p_cidades varch
 $$ LANGUAGE plpgsql;
 
 SELECT * FROM resultado(1, ARRAY['Tijuca'], ARRAY['Rio de Janeiro', 'São Paulo']);
---SELECT * FROM resultado(1, null, null);
+
