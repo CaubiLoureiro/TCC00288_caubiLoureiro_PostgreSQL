@@ -124,122 +124,37 @@ insert into escolha values (5,1,3,1);
 
 
 
-CREATE FUNCTION repeticoes(elemento integer, vetor integer[]) RETURNS real AS $$
+CREATE OR REPLACE FUNCTION resultado(p_pesquisa INTEGER)
+RETURNS TABLE(perguntaID int, frequencia float[][]) AS $$
     DECLARE
-        repeti_abs real = 0;
-        len real = cardinality(vetor);
+        respostaCorrente RECORD;
+        perguntaCorrente RECORD;
+        frequenciaCorrente integer;
+        matrizResultado float[][];
+        linha float[];
+        totalRespostas integer;
     BEGIN
-        FOR i IN 1..len LOOP
-            IF (vetor[i] = elemento) THEN
-                repeti_abs = repeti_abs + 1;
-            END IF;
-        END LOOP;
-        RETURN repeti_abs / len;
-    END;
-$$ LANGUAGE plpgsql;
 
-CREATE FUNCTION vetor_perguntas(pesquisa integer) RETURNS integer[] AS $$
-    DECLARE
-        perguntas integer[];
-        p RECORD;
-    BEGIN
-        FOR p IN (  SELECT pergunta.numero FROM pergunta JOIN pesquisa ON (pergunta.pesquisa = pesquisa.numero) GROUP BY pergunta.numero ORDER BY pergunta.numero ASC) LOOP
-        perguntas = perguntas || p.numero;
-        END LOOP;
-        RETURN perguntas;
-    END;
-$$ LANGUAGE plpgsql;
+        CREATE TEMPORARY TABLE ans(perguntaID integer, frequencia float[][]);
 
+        FOR perguntaCorrente IN select * from pergunta LOOP -- Acha pergunta
+            -- RAISE NOTICE 'Primeiro Loop: %', perguntaCorrente;
+            select count(*) from resposta where pergunta = perguntaCorrente.numero into totalRespostas;
+            -- RAISE NOTICE 'Total respostas: %', totalRespostas;
+            FOR respostaCorrente IN select * from resposta where pergunta = perguntaCorrente.numero LOOP -- Acha resposta
+                select count(*) from escolha where pergunta = perguntaCorrente.numero and resposta = respostaCorrente.numero and pesquisa = p_pesquisa into frequenciaCorrente; -- Quantas vezes aquela resposta apareceu para aquela pergunta
+                --RAISE NOTICE 'Para a pergunta % a resposta % apareceu % vezes   -> Total respostas: %', perguntaCorrente.numero, respostaCorrente.numero, frequenciaCorrente, totalRespostas;
 
-CREATE FUNCTION alternativas(id_pergunta integer) RETURNS integer[] AS $$
-    DECLARE
-        x integer[];
-    BEGIN
-        SELECT array_agg(numero) INTO x FROM resposta WHERE (pergunta = id_pergunta) GROUP BY pesquisa, pergunta;
-        RETURN x;
-    END;
-$$ LANGUAGE plpgsql;
-
-
-
-CREATE FUNCTION vetor_respostas(id_pesquisa integer, id_pregunta integer) RETURNS integer[] AS $$
-    DECLARE
-        respostas integer[];
-    BEGIN
-        SELECT array_agg(resposta) INTO respostas
-        FROM escolha
-        WHERE (pesquisa = id_pesquisa AND pergunta = id_pregunta)
-        GROUP BY pesquisa, pergunta;
-        RETURN respostas;
-    END;
-$$ LANGUAGE plpgsql;
-
-CREATE FUNCTION Lresp(pesq_id integer, perg_id integer, p_bairros varchar[], p_cidades varchar[]) RETURNS integer[] AS $$
-    DECLARE
-        respostas integer[];
-        
-        
-    BEGIN
-        WITH aux1 AS (
-            SELECT pesquisa, pergunta, resposta, bairro
-            FROM escolha JOIN entrevista ON (escolha.entrevista = entrevista.numero)
-        ), aux2 AS (
-            SELECT pesquisa, pergunta, resposta, bairro, bairro.nome as bairro_nome, cidade as cidade_id
-            FROM aux1 JOIN bairro ON (aux1.bairro = bairro.numero)
-        ), aux3 AS (
-            SELECT pesquisa, pergunta, resposta, bairro_nome, cidade.nome as cidade_nome
-            FROM aux2 JOIN cidade ON (aux2.cidade_id = cidade.numero)
-        ), aux4 AS (
-            SELECT *
-            FROM aux3
-            WHERE (bairro_nome = ANY(p_bairros) AND cidade_nome = ANY(p_cidades))
-        )   SELECT array_agg(resposta) INTO respostas
-            FROM aux4
-            WHERE (pesquisa = pesq_id OR pergunta = perg_id)
-            GROUP BY pesquisa, pergunta;
-        RETURN respostas;
-    END;
-$$ LANGUAGE plpgsql;
-
-CREATE FUNCTION resultado(pesquisa integer, p_bairros varchar[], p_cidades varchar[]) RETURNS TABLE(pergunta integer, histograma real[]) AS $$
-    DECLARE
-        histogra real[];
-        respostas integer[];
-        alternativa integer;
-        pergunt integer;
-        x INTEGER[];
-    BEGIN
-        CREATE TEMPORARY TABLE ans (pergunt integer, histograma real[]);
-
-        IF ((p_bairros IS NULL) OR (p_cidades IS NULL)) THEN
-            FOREACH pergunt IN ARRAY vetor_perguntas(pesquisa) LOOP
-                respostas = vetor_respostas(pesquisa, pergunt);
-                IF (respostas IS NOT NULL) THEN
-                    FOREACH alternativa IN ARRAY alternativas(pergunt) LOOP
-                        histogra := array_cat(histogra, ARRAY[ ARRAY[alternativa::real, repeticoes(alternativa, respostas)] ]);
-                    END LOOP;
-                    INSERT INTO ans VALUES(pergunt, histogra);
-                    histogra = '{}';
-                END IF;
+                linha := array_append(array[respostaCorrente.numero::float], (frequenciaCorrente::float/totalRespostas::float));
+                matrizResultado := array_cat(matrizResultado, ARRAY[linha]); --Adiciona linha da matriz
+                -- RAISE NOTICE 'Line: %', matrizResultado;
             END LOOP;
-
-
-
-        ELSE
-            FOREACH pergunt IN ARRAY vetor_perguntas(pesquisa) LOOP
-                respostas = Lresp(pesquisa, pergunt, p_bairros, p_cidades);
-                IF (respostas IS NOT NULL) THEN
-                    FOREACH alternativa IN ARRAY alternativas(pergunt) LOOP
-                        histogra = array_cat(histogra, ARRAY[ ARRAY[alternativa::real, repeticoes(alternativa, respostas)] ]);
-                    END LOOP;
-                    INSERT INTO ans VALUES(pergunt, histogra);
-                    histogra = '{}';
-                END IF;
-            END LOOP;
-        END IF;
-        RETURN QUERY SELECT * FROM ans;
+                INSERT INTO ans VALUES(perguntaCorrente.numero, matrizResultado);
+                totalRespostas := 0;
+                matrizResultado := null;
+        END LOOP;
+        RETURN QUERY select * from ans;
     END;
 $$ LANGUAGE plpgsql;
 
-SELECT * FROM resultado(1, ARRAY['Tijuca'], ARRAY['Rio de Janeiro', 'São Paulo']);
-
+select resultado(1);
